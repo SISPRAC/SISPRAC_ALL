@@ -35,7 +35,7 @@ import createSolicitudVisitaModel from "../models/solicitudVisitaModel.js";
 import createVisitaModel from "../models/visitaModel.js";
 import createTipoRequisitoDocumentoModel from "../models/tipoRequisitoDocumentoModel.js";
 import createVisitaArchivoModel from "../models/visitaArchivoModel.js";
-import createPracticaRequisitoDocumentoModel from "../models/practicaRequisitoDocumentoModel.js"; 
+import createPracticaRequisitoDocumentoModel from "../models/practicaRequisitoDocumentoModel.js";
 import createGrupoCandidatoModel from "../models/grupoCandidatoModel.js";
 import createHistorialAperturaVacanteModel
     from "../models/historialAperturaVacanteModel.js";
@@ -66,14 +66,18 @@ export const initDB = async () => {
             throw new Error("No se encontró DATABASE_URL en las variables de entorno");
         }
 
+        const usarSSL = process.env.DB_SSL === "true";
+
         sequelize = new Sequelize(databaseUrl, {
             dialect: "postgres",
-            dialectOptions: {
-                ssl: {
-                    require: true,
-                    rejectUnauthorized: false
+            dialectOptions: usarSSL
+                ? {
+                    ssl: {
+                        require: true,
+                        rejectUnauthorized: false
+                    }
                 }
-            },
+                : {},
             logging: false,
             pool: {
                 max: 5,

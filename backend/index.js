@@ -47,8 +47,6 @@ import { iniciarVencimientoConvenios } from "./infraestructura/jobs/vencerConven
 import { iniciarFinalizacionPracticas } from "./infraestructura/jobs/finalizarPracticas.js";
 import { iniciarRespaldoPeriodos } from "./infraestructura/jobs/respaldarPeriodosJob.js";
 
-
-
 dotenv.config();
 const app = express();
 app.use(express.json());
@@ -57,6 +55,7 @@ app.set("trust proxy", 1);
 
 const allowedOrigins = [
   "http://localhost:5173",
+  "http://localhost:8081",
   "https://frontend-sigma-blush-19.vercel.app"
 ];
 
@@ -66,7 +65,7 @@ app.use(cors({
       return callback(null, true);
     }
 
-    return callback(new Error("Origen no permitido por CORS"));
+    return callback(new Error(`Origen no permitido por CORS: ${origin}`));
   },
   credentials: true,
 }));
