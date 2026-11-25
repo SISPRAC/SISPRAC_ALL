@@ -1,0 +1,284 @@
+import { crearGrupo } from "../../aplicacion/casos_de_uso/grupo/createGrupo.js";
+import { getGrupos } from "../../aplicacion/casos_de_uso/grupo/getGrupos.js";
+import { getGrupo } from "../../aplicacion/casos_de_uso/grupo/getGrupo.js";
+import { grupoRepository } from "../../infraestructura/repositorios/grupoRepositoryImpl.js";
+import { grupoCandidatoRepository } from "../../infraestructura/repositorios/grupoCandidatoRepository.js";
+import { getCandidatosGrupo } from "../../aplicacion/casos_de_uso/grupo/getCandidatosGrupo.js";
+import { eliminarGrupo } from "../../aplicacion/casos_de_uso/grupo/eliminarGrupo.js";
+import { editarGrupo } from "../../aplicacion/casos_de_uso/grupo/editarGrupo.js";
+import { getGruposByPracticaId } from "../../aplicacion/casos_de_uso/grupo/getGruposByPracticaId.js";
+import { getPracticantesDocumentosByGrupo } from "../../aplicacion/casos_de_uso/grupo/getPracticantesDocumentosByGrupo.js";
+import { practicaRequisitoDocumentoSubidoRepository } from "../../infraestructura/repositorios/practicaRequisitoDocumentoSubidoRepositoryImpl.js";
+import { obtenerGruposParaReportePorPeriodo } from "../../aplicacion/casos_de_uso/grupo/obtenerGruposParaReportePorPeriodo.js";
+import { TutorDocenteRepository } from "../../infraestructura/repositorios/tutorDocenteRepositoryImpl.js";
+import { practicaRepository } from "../../infraestructura/repositorios/practicaRepositoryImpl.js";
+import { notificacionRepository } from "../../infraestructura/repositorios/notificacionRepositoryImpl.js";
+
+export const CrearGrupoController = async (req, res) => {
+
+    try {
+
+        const result = await crearGrupo(
+            {
+                grupoRepository,
+                grupoCandidatoRepository,
+                TutorDocenteRepository,
+                practicaRepository,
+                notificacionRepository
+            },
+            req.body
+        );
+
+        res.status(201).json(result);
+
+    } catch (error) {
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error interno del servidor" + error.message
+        });
+    }
+};
+
+export const getGruposController = async (req, res) => {
+
+    try {
+
+        const grupos = await getGrupos(grupoRepository);
+
+        res.status(200).json(grupos);
+
+    } catch (error) {
+
+        console.log("Error en getGruposController:", error);
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error interno del servidor"
+        });
+    }
+};
+
+export const getGruposByPracticaIdController = async (req, res) => {
+
+    try {
+
+        const practica_id = req.params.practica_id;
+
+        const grupos = await getGruposByPracticaId(
+            grupoRepository,
+            practica_id
+        );
+
+        return res.status(200).json(grupos);
+
+    } catch (error) {
+
+        console.log("Error en getGruposByPracticaIdController:", error);
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error al obtener los grupos de la práctica"
+        });
+    }
+};
+
+export const getCandidatosByGrupoController = async (req, res) => {
+
+    try {
+
+        const grupoId = req.params.id;
+
+        const candidatos = await getCandidatosGrupo(
+            grupoRepository,
+            grupoId
+        );
+
+        res.status(200).json(candidatos);
+
+    } catch (error) {
+
+        console.log("Error en getCandidatosByGrupoController:", error);
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error al obtener candidatos del grupo" + error.message
+        });
+    }
+};
+
+export const getGrupoController = async (req, res) => {
+
+    try {
+
+        const grupoId = req.params.id;
+
+        const grupo = await getGrupo(
+            grupoRepository,
+            grupoId
+        );
+
+        res.status(200).json(grupo);
+
+    } catch (error) {
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error interno del servidor"
+        });
+    }
+};
+
+export const getPracticantesDocumentosByGrupoController = async (req, res) => {
+    try {
+        const grupoId = req.params.id;
+
+        const practicantes = await getPracticantesDocumentosByGrupo(
+            {
+                grupoRepository,
+                practicaRequisitoDocumentoSubidoRepository,
+            },
+            grupoId
+        );
+
+        return res.status(200).json(practicantes);
+    } catch (error) {
+        console.log(
+            "Error en getPracticantesDocumentosByGrupoController:",
+            error
+        );
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message,
+            });
+        }
+
+        return res.status(500).json({
+            message:
+                "Error al obtener los documentos de los practicantes del grupo",
+        });
+    }
+};
+
+export const EditarGrupoController = async (req, res) => {
+
+    try {
+
+        const grupoId = req.params.id;
+
+        const result = await editarGrupo(
+            {
+                grupoRepository,
+                grupoCandidatoRepository,
+                TutorDocenteRepository,
+                practicaRepository,
+                notificacionRepository
+            },
+            req.body,
+            grupoId
+        );
+
+        return res.status(200).json(result);
+
+    } catch (error) {
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error al editar el grupo"
+        });
+    }
+};
+
+export const deleteGrupoController = async (req, res) => {
+
+    try {
+
+        const result = await eliminarGrupo(
+            {
+                grupoRepository,
+                grupoCandidatoRepository,
+                TutorDocenteRepository,
+                practicaRepository,
+                notificacionRepository
+            },
+            req.params.id
+        );
+
+        res.status(200).json(result);
+
+    } catch (error) {
+        console.log("Erro de grupo", error);
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error al eliminar el grupo"
+        });
+    }
+};
+
+export const obtenerGruposParaReportePorPeriodoController = async (req, res) => {
+
+    try {
+
+        const periodo_id = req.params.periodo_id;
+
+        const grupos = await obtenerGruposParaReportePorPeriodo(
+            { grupoRepository },
+            periodo_id
+        );
+
+        return res.status(200).json(grupos);
+
+    } catch (error) {
+
+        console.log(
+            "Error en obtenerGruposParaReportePorPeriodoController:",
+            error
+        );
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error al obtener los grupos para el reporte"
+        });
+    }
+};

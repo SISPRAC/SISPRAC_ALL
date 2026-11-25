@@ -1,0 +1,296 @@
+import { registerCandidato } from "../../aplicacion/casos_de_uso/candidato/registrarCandidato.js";
+import { updateCandidato } from "../../aplicacion/casos_de_uso/candidato/actualizarCandidato.js";
+import { getCandidatos } from "../../aplicacion/casos_de_uso/candidato/getCandidatos.js";
+import { getCandidatosDisponibles } from "../../aplicacion/casos_de_uso/candidato/getCandidatosDisponibles.js";
+import { getCandidatosPerfil } from "../../aplicacion/casos_de_uso/candidato/getCandidatosPerfil.js";
+import { invitarCandidato } from "../../aplicacion/casos_de_uso/invitarUsuario/invitarCandidato.js";
+import { invitarCandidatosMasivo } from "../../aplicacion/casos_de_uso/invitarUsuario/invitarCandidatosMasivo.js";
+
+import { candidatoRepository } from "../../infraestructura/repositorios/candidatoRepositoryImpl.js";
+import { userRepository } from "../../infraestructura/repositorios/userRepositoryImpl.js";
+import { rolRepository } from "../../infraestructura/repositorios/rolRepositoryImpl.js";
+import { perfilRepository } from "../../infraestructura/repositorios/perfilRepositoryImpl.js";
+import { candidatoPerfilRepository } from "../../infraestructura/repositorios/candidatoPerfilRepositoryImpl.js";
+import { archivoRepository } from "../../infraestructura/repositorios/archivoRepositoryImpl.js";
+import { grupoRepository } from "../../infraestructura/repositorios/grupoRepositoryImpl.js";
+import { obtenerCandidatosParaReportePorPeriodo } from "../../aplicacion/casos_de_uso/candidato/obtenerCandidatosParaReportePorPeriodo.js";
+
+import { sequelize } from "../../infraestructura/database/dbConnection.js";
+
+import { grupoCandidatoRepository } from "../../infraestructura/repositorios/grupoCandidatoRepository.js";
+import { habilidadBlandaRepository } from "../../infraestructura/repositorios/habilidadBlandaRepositoryImpl.js";
+import { candidatoHabilidadBlandaRepository } from "../../infraestructura/repositorios/candidatoHabilidadBlandaRepository.js";
+import { idiomaRepository } from "../../infraestructura/repositorios/idiomaRepository.js";
+import { candidatoIdiomaRepository } from "../../infraestructura/repositorios/candidatoIdiomaRepository.js";
+import { verificarCandidatosPdf } from "../../aplicacion/casos_de_uso/candidato/verificarCandidatosPdf.js";
+
+import {
+    getPerfilProfesional,
+    actualizarPerfilProfesional
+} from "../../aplicacion/casos_de_uso/candidato/perfilProfesional.js";
+
+const getReposPerfilProfesional = () => ({
+    sequelize, candidatoRepository, perfilRepository, candidatoPerfilRepository,
+    habilidadBlandaRepository, candidatoHabilidadBlandaRepository,
+    idiomaRepository, candidatoIdiomaRepository
+});
+
+const manejarError = (res, error) => {
+    if (error.statusCode) {
+        return res.status(error.statusCode).json({ message: error.message });
+    }
+    console.error("Error perfil profesional:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+};
+
+export const registerCandidatoController = async (req, res) => {
+
+    try {
+
+        const invitacion = req.invitacion;
+
+        const result = await registerCandidato(
+            sequelize,
+            userRepository,
+            candidatoRepository,
+            rolRepository,
+            perfilRepository,
+            candidatoPerfilRepository,
+            habilidadBlandaRepository,
+            candidatoHabilidadBlandaRepository,
+            idiomaRepository,
+            candidatoIdiomaRepository,
+            archivoRepository,
+            grupoCandidatoRepository,
+            {
+                ...req.body,
+
+                // Datos provenientes de la invitación verificada
+                correo: invitacion.correo,
+                codigo: invitacion.codigo,
+                grupo_id: invitacion.grupo_id || null
+            },
+            req.file
+        );
+
+        return res.status(201).json(result);
+
+    } catch (error) {
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        console.log("Error al registrar candidato:", error);
+
+        return res.status(500).json({
+            message: "Error interno del servidor"
+        });
+    }
+};
+
+export const updateCandidatoController = async (req, res) => {
+
+    try {
+
+        const result = await updateCandidato(
+            sequelize,
+            userRepository,
+            candidatoRepository,
+            perfilRepository,
+            candidatoPerfilRepository,
+            archivoRepository,
+            req.params.id,
+            req.body,
+            req.file
+        );
+
+        return res.status(200).json(result);
+
+    } catch (error) {
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error interno del servidor"
+        });
+    }
+};
+
+export const getCandidatosController = async (req, res) => {
+
+    try {
+
+        const candidatos =
+            await getCandidatos(candidatoRepository);
+
+        return res.status(200).json(candidatos);
+
+    } catch (error) {
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error interno del servidor"
+        });
+    }
+};
+
+export const getCandidatosDisponiblesController = async (req, res) => {
+
+    try {
+
+        const candidatos =
+            await getCandidatosDisponibles(
+                candidatoRepository
+            );
+
+        return res.status(200).json(candidatos);
+
+    } catch (error) {
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error interno del servidor"
+        });
+    }
+};
+
+export const getCandidatosPerfilController = async (req, res) => {
+
+    try {
+
+        const candidatos = await getCandidatosPerfil(
+            candidatoRepository,
+            req.params.perfilNombre
+        );
+
+        return res.status(200).json(candidatos);
+
+    } catch (error) {
+
+        console.log("Error al obtener", error);
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: "Error interno del servidor"
+        });
+    }
+};
+
+export const invitarCandidatoController = async (req, res) => {
+    try {
+        const result = await invitarCandidato(
+            grupoRepository,
+            {
+                correo: req.body.correo,
+                codigo: req.body.codigo,
+                nombre: req.body.nombre,
+                grupo_id: req.body.grupo_id
+            }
+        );
+        return res.status(200).json(result);
+    } catch (error) {
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ message: error.message });
+        }
+        console.log("Error al enviar invitación al candidato:", error);
+        return res.status(500).json({ message: "Error interno del servidor" });
+    }
+};
+
+export const invitarCandidatosMasivoController = async (req, res) => {
+    try {
+        const result = await invitarCandidatosMasivo(
+            grupoRepository,
+            {
+                candidatos: req.body.candidatos,
+                grupo_id: req.body.grupo_id
+            }
+        );
+        return res.status(200).json(result);
+    } catch (error) {
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ message: error.message });
+        }
+        console.log("Error al enviar invitaciones masivas:", error);
+        return res.status(500).json({ message: "Error interno del servidor" });
+    }
+};
+
+export const obtenerCandidatosParaReportePorPeriodoController = async (req, res) => {
+    try {
+        const candidatos = await obtenerCandidatosParaReportePorPeriodo(
+            { candidatoRepository },
+            req.params.periodo_id
+        );
+
+        return res.status(200).json(candidatos);
+
+    } catch (error) {
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                message: error.message
+            });
+        }
+
+        console.error("Error al obtener candidatos para el reporte:", error);
+
+        return res.status(500).json({
+            message: "Error interno del servidor"
+        });
+    }
+};
+
+export const verificarCandidatosPdfController = async (req, res) => {
+    try {
+        const result = await verificarCandidatosPdf(
+            candidatoRepository,
+            req.body.alumnos
+        );
+
+        return res.status(200).json(result);
+
+    } catch (error) {
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ message: error.message });
+        }
+
+        console.log("Error al verificar candidatos del PDF:", error);
+
+        return res.status(500).json({ message: "Error interno del servidor" });
+    }
+};
+
+export const getMiPerfilProfesionalController = async (req, res) => {
+    try {
+        res.status(200).json(await getPerfilProfesional(getReposPerfilProfesional(), req.user.id));
+    } catch (e) { manejarError(res, e); }
+};
+
+export const updateMiPerfilProfesionalController = async (req, res) => {
+    try {
+        res.status(200).json(
+            await actualizarPerfilProfesional(getReposPerfilProfesional(), req.user.id, req.body));
+    } catch (e) { manejarError(res, e); }
+};

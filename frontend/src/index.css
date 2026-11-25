@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Scrollbar principal del sistema: comportamiento nativo */
+.custom-scrollbar {
+    overflow: auto;
+    scrollbar-width: auto;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+/* Chrome, Edge y Safari */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+}
+
+/* Sidebar */
+.custom-scrollbar-sidebar {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
+.custom-scrollbar-sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.custom-scrollbar-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 10px;
+}
+
+/* En dispositivos táctiles, conservar el desplazamiento natural */
+@media (hover: none) and (pointer: coarse) {
+    .custom-scrollbar,
+    .custom-scrollbar-sidebar {
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar,
+    .custom-scrollbar-sidebar::-webkit-scrollbar {
+        display: none;
+    }
+}

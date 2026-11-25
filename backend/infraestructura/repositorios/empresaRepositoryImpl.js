@@ -1,0 +1,336 @@
+import { Op } from "../database/sequelizeOperators.js";
+import { models } from "../database/dbConnection.js";
+
+export const empresaRepository = {
+
+    async create(data, transaction) {
+        return await models.Empresa.create(data, {
+            transaction
+        });
+    },
+
+    async findById(id) {
+        return await models.Empresa.findByPk(id);
+    },
+
+    async findByIdConUsuario(id) {
+        return await models.Empresa.findByPk(id, {
+            include: [
+                {
+                    model: models.User,
+                    attributes: ["id", "nombres", "apellidos", "correo"]
+                }
+            ]
+        });
+    },
+
+    async findByUserId(userId) {
+
+        return await models.Empresa.findOne({
+            where: {
+                usuario_id: userId
+            },
+
+            include: [
+                {
+                    model: models.User,
+                    attributes: [
+                        "id",
+                        "nombres",
+                        "apellidos",
+                        "correo",
+                        "tipo_documento",
+                        "cedula",
+                        "telefono"
+                    ]
+                }
+            ]
+        });
+    },
+
+    async findByNit(nit) {
+        return await models.Empresa.findOne({
+            where: { nit }
+        });
+    },
+
+    update: async (id, data, transaction) => {
+
+        const empresa = await models.Empresa.findByPk(
+            id,
+            { transaction }
+        );
+
+        if (!empresa) {
+            return null;
+        }
+
+        return await empresa.update(
+            data,
+            { transaction }
+        );
+    },
+
+    async findAllConDocumentosPorPractica(practica_id) {
+        const empresas = await models.Empresa.findAll({
+            attributes: ["id", "nombre", "nit", "usuario_id"],
+            order: [["nombre", "ASC"]],
+        });
+
+        const usuariosIds = empresas.map((empresa) => empresa.usuario_id);
+
+        if (usuariosIds.length === 0) {
+            return [];
+        }
+
+        const documentos = await models.PracticaRequisitoDocumentoSubido.findAll({
+            attributes: [
+                "id",
+                "usuario_id",
+                "practica_requisito_documento_id",
+                "estado",
+                "fecha_subida",
+            ],
+            where: {
+                usuario_id: {
+                    [Op.in]: usuariosIds,
+                },
+            },
+            include: [
+                {
+                    model: models.PracticaRequisitoDocumento,
+                    as: "practicaRequisitoDocumento",
+                    attributes: ["id", "practica_id", "estado"],
+                    where: {
+                        practica_id,
+                        estado: true,
+                    },
+                    required: true,
+                    include: [
+                        {
+                            model: models.TipoRequisitoDocumento,
+                            as: "tipoRequisitoDocumento",
+                            attributes: ["id", "nombre"],
+                            where: {
+                                nombre: {
+                                    [Op.notIn]: ["Convenio"],
+                                },
+                            },
+                            required: true,
+                            include: [
+                                {
+                                    model: models.Rol,
+                                    as: "rol",
+                                    attributes: ["id", "nombre"],
+                                    where: {
+                                        nombre: "Empresa",
+                                    },
+                                    required: true,
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        });
+
+        const documentosPorUsuario = new Map();
+
+        for (const documento of documentos) {
+            const usuarioId = documento.usuario_id;
+
+            if (!documentosPorUsuario.has(usuarioId)) {
+                documentosPorUsuario.set(usuarioId, []);
+            }
+
+            documentosPorUsuario.get(usuarioId).push(documento);
+        }
+
+        return empresas.map((empresa) => {
+            const datos = empresa.toJSON();
+
+            return {
+                ...datos,
+                User: {
+                    id: datos.usuario_id,
+                    documentosRequisitosSubidos:
+                        documentosPorUsuario.get(datos.usuario_id) ?? [],
+                },
+            };
+        });
+    },
+
+    async findAllParaReportePorPeriodo(periodo_id) {
+        return await models.Empresa.findAll({
+            attributes: [
+                "id",
+                "nit",
+                "nombre",
+                "direccion",
+                "logo",
+                "usuario_id",
+            ],
+            include: [
+                {
+                    model: models.User,
+                    attributes: [
+                        "id",
+                        "nombres",
+                        "apellidos",
+                        "correo",
+                        "telefono",
+                        "estado",
+                    ],
+                    required: false,
+                },
+                {
+                    model: models.Convenio,
+                    attributes: [
+                        "id",
+                        "estado",
+                        "fecha_inicio",
+                        "fecha_fin",
+                        "fecha_envio",
+                    ],
+                    required: false,
+                    include: [
+                        {
+                            model: models.Vacante,
+                            attributes: ["id", "nombre", "descripcion", "estado"],
+                            required: false,
+                            include: [
+                                {
+                                    model: models.AperturaVacante,
+                                    attributes: [
+                                        "id",
+                                        "practica_id",
+                                        "cupos",
+                                        "estado",
+                                        "vacante_id",
+                                    ],
+                                    required: true,
+                                    include: [
+                                        {
+                                            model: models.Practica,
+                                            as: "practica",
+                                            attributes: [
+                                                "id",
+                                                "periodo_id",
+                                                "fecha_inicio",
+                                                "fecha_fin",
+                                                "estado",
+                                            ],
+                                            where: { periodo_id },
+                                            required: true,
+                                        },
+                                        {
+                                            model: models.Postulacion,
+                                            attributes: [
+                                                "id",
+                                                "estado",
+                                                "candidato_id",
+                                                "aperturaVacante_id",
+                                            ],
+                                            required: false,
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+            order: [["nombre", "ASC"]],
+        });
+    },
+
+    async findPracticantesParaReportePorPeriodo(periodo_id) {
+        return await models.Postulacion.findAll({
+            attributes: ["id", "estado", "candidato_id", "aperturaVacante_id"],
+            include: [
+                {
+                    model: models.AperturaVacante,
+                    attributes: ["id", "vacante_id", "practica_id"],
+                    required: true,
+                    include: [
+                        {
+                            model: models.Practica,
+                            as: "practica",
+                            attributes: ["id", "periodo_id"],
+                            where: { periodo_id },
+                            required: true,
+                        },
+                        {
+                            model: models.Vacante,
+                            attributes: ["id", "nombre", "convenio_id"],
+                            required: true,
+                            include: [
+                                {
+                                    model: models.Convenio,
+                                    attributes: ["id", "empresa_id"],
+                                    required: true,
+                                },
+                            ],
+                        },
+                    ],
+                },
+                {
+                    model: models.Candidato,
+                    attributes: ["id", "codigo", "usuario_id"],
+                    required: true,
+                    include: [
+                        {
+                            model: models.User,
+                            attributes: [
+                                "id",
+                                "nombres",
+                                "apellidos",
+                                "correo",
+                                "cedula",
+                            ],
+                            required: true,
+                        },
+                        {
+                            model: models.Practicante,
+                            as: "practicante",
+                            attributes: ["id", "candidato_id"],
+                            required: true,
+                            include: [
+                                {
+                                    model: models.PracticaPracticante,
+                                    as: "practicas",
+                                    attributes: ["id", "estado", "practica_id"],
+                                    required: true,
+                                    include: [
+                                        {
+                                            model: models.Practica,
+                                            as: "practica",
+                                            attributes: ["id", "periodo_id"],
+                                            where: { periodo_id },
+                                            required: true,
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        });
+    },
+
+    async findAllConConvenios() {
+        return await models.Empresa.findAll({
+            attributes: ["id", "nombre", "nit"],
+            include: [
+                {
+                    model: models.Convenio,
+                    attributes: ["id", "estado", "fecha_inicio", "fecha_fin"],
+                    required: true, // sin convenio no aparece
+                },
+            ],
+            order: [["nombre", "ASC"]],
+        });
+    },
+
+};

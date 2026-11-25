@@ -1,0 +1,531 @@
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import { Trash, SquarePen } from "lucide-react";
+
+
+import GenericTable from "../../components/Table/GenericTable";
+import AddButton from "../../components/buttons/Addbutton.jsx";
+import ConfirmModal from "../../components/modals/ConfirmModal";
+import PracticaRequisitoDocumentoModal from "../../components/modals/PracticaRequisitoDocumentoModal";
+import { getPracticaActual } from "../../../presentacion/components/utils/getPracticaActual.js";
+import { practicaRepository } from "../../../infraestructura/repository/practicaRepository.js";
+
+import { practicaRequisitoDocumentoRepository } from "../../../infraestructura/repository/practicaRequisitoDocumentoRepository.js";
+
+import { getPracticas } from "../../../aplicacion/practica/getPracticas.js";
+
+import { crearPracticaRequisitoDocumento } from "../../../aplicacion/practicaRequisitoDocumento/createPracticaRequisitoDocumento.js";
+import { actualizarPracticaRequisitoDocumento } from "../../../aplicacion/practicaRequisitoDocumento/actualizarPracticaRequisitoDocumento.js";
+import { eliminarPracticaRequisitoDocumento } from "../../../aplicacion/practicaRequisitoDocumento/eliminarPracticaRequisitoDocumento.js";
+import { obtenerPracticaRequisitoDocumento } from "../../../aplicacion/practicaRequisitoDocumento/obtenerPracticaRequisitoDocumento.js";
+import { obtenerPracticaRequisitosDocumento } from "../../../aplicacion/practicaRequisitoDocumento/obtenerPracticaRequisitosDocumento.js";
+
+
+export default function PracticaRequisitoDocumentoPage() {
+
+    const [practicas, setPracticas] = useState([]);
+
+    const [practicaSeleccionada, setPracticaSeleccionada] = useState("");
+
+    const [rows, setRows] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const [isOpen, setIsOpen] = useState(false);
+    const [mode, setMode] = useState("create");
+    const [selectedRequisito, setSelectedRequisito] = useState(null);
+
+    const [deleteModal, setDeleteModal] = useState(false);
+    const [requisitoToDelete, setRequisitoToDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+
+
+    useEffect(() => {
+
+        loadPracticas();
+
+    }, []);
+
+
+    useEffect(() => {
+
+        if (!practicaSeleccionada) {
+
+            setRows([]);
+
+            return;
+
+        }
+
+        loadRequisitos();
+
+    }, [practicaSeleccionada]);
+
+
+    const loadPracticas = async () => {
+
+        try {
+
+            const data = await getPracticas({
+                practicaRepository
+            });
+
+            const lista = data || [];
+            setPracticas(lista);
+
+            // seleccionar automáticamente la práctica en curso
+            const actual = getPracticaActual(lista);
+
+            if (actual) {
+                setPracticaSeleccionada(String(actual.id));
+            }
+
+        } catch (error) {
+
+            console.log(error);
+
+            toast.error(
+                "Error al cargar las prácticas"
+            );
+
+        }
+
+    };
+
+    const loadRequisitos = async () => {
+
+        try {
+
+            const data =
+                await obtenerPracticaRequisitosDocumento(
+                    {
+                        practicaRequisitoDocumentoRepository
+                    },
+                    practicaSeleccionada
+                );
+
+            console.log(data);
+
+            setRows(data);
+            setCurrentPage(1);
+
+        } catch (error) {
+
+            console.log(error);
+
+            toast.error(
+                "Error al cargar los requisitos"
+            );
+
+        }
+
+    };
+
+
+    const handleCreate = () => {
+
+        if (!practicaSeleccionada) {
+
+            toast.error(
+                "Seleccione primero una práctica."
+            );
+
+            return;
+
+        }
+
+        setSelectedRequisito(null);
+        setMode("create");
+        setIsOpen(true);
+
+    };
+
+
+    const handleEdit = async (id) => {
+
+        try {
+
+            const requisito =
+                await obtenerPracticaRequisitoDocumento(
+                    {
+                        practicaRequisitoDocumentoRepository
+                    },
+                    id
+                );
+
+            if (!requisito) {
+
+                toast.error(
+                    "No se encontró el requisito."
+                );
+
+                return;
+
+            }
+
+            setSelectedRequisito(requisito);
+
+            setMode("edit");
+
+            setIsOpen(true);
+
+        } catch (error) {
+
+            console.log(error);
+
+            toast.error(
+                error.response?.data?.message ||
+                "Error al cargar el requisito."
+            );
+
+        }
+
+    };
+
+
+    const handleSave = async (formData) => {
+        const yaExiste = rows.some(
+            r =>
+                Number(
+                    r.tipo_requisito_documento_id ??
+                    r.tipoRequisitoDocumento?.id
+                ) === Number(formData.tipo_requisito_documento_id)
+        );
+
+        if (yaExiste) {
+            toast.error("Ese documento ya está asignado a esta práctica.");
+            return;
+        }
+        try {
+
+            await crearPracticaRequisitoDocumento(
+                {
+                    practicaRequisitoDocumentoRepository
+                },
+                {
+                    ...formData,
+                    practica_id: practicaSeleccionada
+                }
+            );
+
+            await loadRequisitos();
+
+            toast.success(
+                "Requisito documental creado."
+            );
+
+            setIsOpen(false);
+
+        } catch (error) {
+
+            console.log(error);
+
+            toast.error(
+                error.response?.data?.message ||
+                "Error al crear el requisito."
+            );
+
+        }
+
+    };
+
+
+    const handleUpdate = async (formData) => {
+
+        try {
+
+            await actualizarPracticaRequisitoDocumento(
+                {
+                    practicaRequisitoDocumentoRepository
+                },
+                formData.id,
+                formData
+            );
+
+            await loadRequisitos();
+
+            toast.success(
+                "Requisito actualizado."
+            );
+
+            setIsOpen(false);
+
+        } catch (error) {
+
+            console.log(error);
+
+            toast.error(
+                error.response?.data?.message ||
+                "Error al actualizar."
+            );
+
+        }
+
+    };
+
+
+    const deleteRow = (data) => {
+
+        console.log("Dato recibido al eliminar:", data);
+
+        const requisito = typeof data === "object"
+            ? data
+            : rows.find(r => r.id === data);
+
+        console.log("Requisito seleccionado:", requisito);
+
+        setRequisitoToDelete(requisito);
+        setDeleteModal(true);
+    };
+
+
+    const handleDelete = async () => {
+
+        if (!requisitoToDelete?.id) {
+            toast.error("No se encontró el ID del requisito.");
+            return;
+        }
+
+        try {
+
+            setDeleting(true);
+
+            await eliminarPracticaRequisitoDocumento(
+                {
+                    practicaRequisitoDocumentoRepository
+                },
+                requisitoToDelete.id
+            );
+
+            await loadRequisitos();
+
+            toast.success("Requisito eliminado.");
+
+            setDeleteModal(false);
+            setRequisitoToDelete(null);
+
+        } catch (error) {
+
+            console.log("ERROR COMPLETO:", error);
+
+            toast.error(
+                error.response?.data?.message ||
+                "Error al eliminar."
+            );
+
+        } finally {
+
+            setDeleting(false);
+
+        }
+    };
+
+
+    const practicaActual = practicas.find(
+        practica =>
+            practica.id === Number(
+                practicaSeleccionada
+            )
+    );
+
+
+    return (
+
+        <div
+        >
+
+            <h1
+                className="
+                    text-[26px]
+                    font-extrabold
+                    text-slate-800
+                    text-center
+                    mb-7
+                    tracking-tight
+                "
+            >
+                Gestión de Fechas Documentos Practicante
+            </h1>
+
+            <div
+                className="
+        bg-white
+        rounded-2xl
+        shadow-sm
+        border
+        p-5
+        mb-6
+    "
+            >
+
+                <div>
+
+                    <label
+                        className="
+                block
+                mb-2
+                font-semibold
+                text-slate-700
+            "
+                    >
+                        Práctica
+                    </label>
+
+                    <select
+                        value={practicaSeleccionada}
+                        onChange={(e) => {
+
+                            setPracticaSeleccionada(
+                                e.target.value
+                            );
+
+                        }}
+                        className="
+                w-full
+                rounded-xl
+                border
+                p-3
+                focus:outline-none
+                focus:ring-2
+                focus:ring-[#e8192c]
+            "
+                    >
+
+                        <option value="">
+                            Seleccione una práctica
+                        </option>
+
+                        {
+                            practicas.map(
+                                practica => (
+
+                                    <option
+                                        key={practica.id}
+                                        value={practica.id}
+                                    >
+                                        {
+                                            practica.Periodo?.nombre
+                                        }
+                                    </option>
+
+                                )
+                            )
+                        }
+
+                    </select>
+
+                </div>
+
+            </div>
+
+            <GenericTable
+                rows={rows}
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+                pageSize={8}
+                emptyMessage={
+                    practicaSeleccionada
+                        ? "No existen requisitos documentales."
+                        : "Seleccione una práctica."
+                }
+                columns={[
+                    {
+                        key: "nombre",
+                        label: "Documento",
+                        primary: true,
+                        render: row =>
+                            row.tipoRequisitoDocumento?.nombre || ""
+                    },
+                    {
+                        key: "rol",
+                        label: "Rol",
+                        render: row =>
+                            row.tipoRequisitoDocumento?.rol?.nombre || ""
+                    },
+                    {
+                        key: "fecha_inicio",
+                        label: "Inicio"
+                    },
+                    {
+                        key: "fecha_limite",
+                        label: "Fecha límite"
+                    },
+                    {
+                        key: "obligatorio",
+                        label: "Obligatorio",
+                        render: row =>
+                            row.tipoRequisitoDocumento?.obligatorio
+                                ? "Sí"
+                                : "No"
+                    },
+                    {
+                        key: "estado",
+                        label: "Estado",
+                        render: row =>
+                            row.estado
+                                ? "Activo"
+                                : "Inactivo"
+                    }
+                ]}
+                actions={[
+                    {
+                        icon:
+                            <SquarePen size={22} />,
+                        className:
+                            "hover:bg-blue-100",
+                        onClick: handleEdit
+                    },
+                    {
+                        icon:
+                            <Trash size={22} />,
+                        className:
+                            "hover:bg-red-100",
+                        onClick: deleteRow
+                    }
+                ]}
+            />
+
+
+            {
+                practicaSeleccionada && (
+
+                    <AddButton
+                        onClick={handleCreate}
+                    />
+
+                )
+            }
+
+
+            <PracticaRequisitoDocumentoModal
+                isOpen={isOpen}
+                onClose={() => setIsOpen(false)}
+                onSubmit={mode === "edit" ? handleUpdate : handleSave}
+                requisito={selectedRequisito}
+                requisitosExistentes={rows}
+                practicaId={practicaSeleccionada}
+                practicaNombre={practicaActual?.Periodo?.nombre || ""}
+            />
+
+
+            <ConfirmModal
+                isOpen={deleteModal}
+                title="Eliminar requisito documental"
+                message={
+                    `¿Desea eliminar el documento "${requisitoToDelete?.tipoRequisitoDocumento?.nombre || ""}"?`
+                }
+                confirmLabel="Eliminar"
+                cancelLabel="Cancelar"
+                loading={deleting}
+                onConfirm={handleDelete}
+                onCancel={() => {
+                    if (deleting) return;
+                    setDeleteModal(false);
+                    setRequisitoToDelete(null);
+                }}
+            />
+
+        </div>
+
+    );
+
+}

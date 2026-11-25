@@ -1,0 +1,135 @@
+import { BadRequestError } from "../../../shared/errors/BadRequestError.js";
+import { validarRespuestasEncuesta } from "./validarRespuestasEncuesta.js";
+
+import { notificarEncuestaRespondida } from "../notificarEmail/notificarEncuestaRespondida.js";
+
+export const responderEncuestaPracticante = async (
+    {
+        plantillaEncuestaRepository,
+        respuestaEncuestaRepository,
+        respuestaPreguntaRepository,
+        practicaPracticanteRepository,   // NUEVO
+        postulacionRepository,           // NUEVO
+        userRepository,                  // NUEVO
+        notificacionRepository           // NUEVO
+    },
+    usuario_id,
+    practica_encuesta_id,
+    respuestas
+) => {
+    // 1. Validar los datos recibidos
+    if (
+        !usuario_id ||
+        !practica_encuesta_id ||
+        !Array.isArray(respuestas) ||
+        respuestas.length === 0
+    ) {
+        throw new BadRequestError("Los datos de la encuesta son obligatorios");
+    }
+
+    // 2. Obtener el candidato y su perfil de practicante mediante el usuario autenticado
+    const candidato =
+        await plantillaEncuestaRepository.findPracticanteByUsuario(usuario_id);
+
+    const practicante_id = candidato?.practicante?.id;
+
+    if (!practicante_id) {
+        throw new BadRequestError(
+            "No se encontró un perfil de practicante asociado al usuario"
+        );
+    }
+
+    // 3. Verificar que el practicante tenga una práctica en curso
+    const practicaPracticante =
+        await plantillaEncuestaRepository.findPracticaPracticanteEnCurso(
+            practicante_id
+        );
+
+    if (!practicaPracticante) {
+        throw new BadRequestError(
+            "No tienes una práctica en curso para responder esta encuesta"
+        );
+    }
+
+    // 4. Obtener las encuestas asignadas a la práctica
+    const encuestas =
+        await plantillaEncuestaRepository.findEncuestasByPractica(
+            practicaPracticante.practica_id
+        );
+
+    // 5. Verificar que la encuesta pertenezca a la práctica actual
+    const encuestaAsignada = encuestas.find(
+        (encuesta) =>
+            Number(encuesta.id) === Number(practica_encuesta_id)
+    );
+
+    if (!encuestaAsignada) {
+        throw new BadRequestError(
+            "La encuesta no está asignada a tu práctica actual"
+        );
+    }
+
+    // 6. Verificar que el usuario no haya respondido ya esta encuesta
+    const respuestaExistente =
+        await respuestaEncuestaRepository.findByUsuarioPracticaEncuesta(
+            usuario_id,
+            practica_encuesta_id,
+            practicante_id
+        );
+
+    if (respuestaExistente) {
+        throw new BadRequestError(
+            "Ya has respondido esta encuesta para tu práctica actual"
+        );
+    }
+
+    // 7. Validar las respuestas según el tipo de cada pregunta
+    const preguntasEncuesta =
+        encuestaAsignada.plantilla?.preguntas || [];
+
+    const filas = validarRespuestasEncuesta(preguntasEncuesta, respuestas);
+
+    // 8. Crear el registro principal de la respuesta
+    const respuestaEncuesta = await respuestaEncuestaRepository.create({
+        usuario_id,
+        practicante_id,
+        practica_encuesta_id,
+        fecha: new Date(),
+    });
+
+    // 9. Guardar las respuestas individuales
+    for (const fila of filas) {
+        await respuestaPreguntaRepository.create({
+            respuesta_encuesta_id: respuestaEncuesta.id,
+            pregunta_id: fila.pregunta_id,
+            respuesta: fila.respuesta,
+        });
+    }
+
+    // 10. Notificar al tutor docente (no afecta el resultado si falla)
+    try {
+
+        await notificarEncuestaRespondida({
+            tipo: "PRACTICANTE",
+            practicaPracticanteId: practicaPracticante.id,
+            usuarioRespondienteId: usuario_id,
+            nombreEncuesta: encuestaAsignada.plantilla?.titulo ?? "Encuesta",
+            practicaPracticanteRepository,
+            postulacionRepository,
+            userRepository,
+            notificacionRepository
+        });
+
+    } catch (errorNotificacion) {
+        console.error(
+            "Error notificando la encuesta respondida por el practicante:",
+            errorNotificacion
+        );
+    }
+
+    // 11. Retornar el resultado
+    return {
+        mensaje: "Encuesta respondida correctamente",
+        respuestaEncuesta,
+    };
+};

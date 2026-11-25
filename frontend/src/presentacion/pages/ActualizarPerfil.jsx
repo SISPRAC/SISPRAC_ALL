@@ -1,0 +1,1068 @@
+
+import { useEffect, useState } from "react";
+import {
+    useNavigate,
+    useOutletContext
+} from "react-router-dom";
+import toast from "react-hot-toast";
+
+import { userRepository } from "../../infraestructura/repository/userRepository";
+import { actualizarPerfil } from "../../aplicacion/usuario/actualizarPerfil";
+import { departamentoMunicipioRepository } from "../../infraestructura/repository/departamentoMunicipioRepository";
+import PerfilProfesionalSection from "../components/PerfilProfesionalSection";
+const tiposDocumento = ["CC", "CE", "PEP", "PA"];
+
+const generos = [
+    "Masculino",
+    "Femenino",
+    "Otro"
+];
+
+const estaLleno = (valor) =>
+    valor !== null &&
+    valor !== undefined &&
+    String(valor).trim() !== "";
+
+const CAMPOS_OBLIGATORIOS_BASE = [
+    "nombres",
+    "apellidos",
+    "tipo_documento",
+    "cedula",
+    "telefono"
+];
+
+const CAMPOS_OBLIGATORIOS_PRACTICANTE = [
+    "eps",
+    "fecha_nacimiento",
+    "genero",
+    "departamentoId",
+    "municipioId",
+    "direccion"
+];
+
+function FieldRow({
+    label,
+    name,
+    type = "text",
+    value,
+    onChange,
+    readOnly = false,
+    disabled = false,
+    options = null,
+    placeholder = "",
+    required = false,
+    error = false,
+    min,
+    max
+}) {
+    const bloqueado = readOnly || disabled;
+
+    return (
+        <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-gray-700">
+                {label}
+                {required && (
+                    <span className="ml-0.5 text-red-500">*</span>
+                )}
+            </label>
+
+            {options ? (
+                <select
+                    name={name}
+                    value={value || ""}
+                    onChange={onChange}
+                    disabled={disabled}
+                    className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition
+                        ${disabled
+                            ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-500"
+                            : error
+                                ? "border-red-400 bg-white text-gray-700 ring-2 ring-red-100"
+                                : "border-gray-200 bg-white text-gray-700 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                        }
+                    `}
+                >
+                    <option value="" disabled>
+                        {placeholder || "Seleccione..."}
+                    </option>
+
+                    {options.map((option) => {
+                        const valueOption =
+                            typeof option === "object"
+                                ? option.value
+                                : option;
+
+                        const labelOption =
+                            typeof option === "object"
+                                ? option.label
+                                : option;
+
+                        return (
+                            <option key={valueOption} value={valueOption}>
+                                {labelOption}
+                            </option>
+                        );
+                    })}
+                </select>
+            ) : (
+                <input
+                    name={name}
+                    type={type}
+                    value={value || ""}
+                    onChange={onChange}
+                    readOnly={bloqueado}
+                    min={min}
+                    max={max}
+                    placeholder={placeholder}
+                    className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition
+                        ${bloqueado
+                            ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-500"
+                            : error
+                                ? "border-red-400 bg-white text-gray-700 ring-2 ring-red-100"
+                                : "border-gray-200 bg-white text-gray-700 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                        }
+                    `}
+                />
+            )}
+
+            {error && !bloqueado && (
+                <span className="text-xs font-medium text-red-500">
+                    Este campo es obligatorio
+                </span>
+            )}
+        </div>
+    );
+}
+
+function FieldLarge({
+    label,
+    name,
+    value,
+    onChange,
+    readOnly = false,
+    placeholder = "",
+    required = false,
+    error = false
+}) {
+    return (
+        <div className="flex flex-col gap-1.5 md:col-span-2">
+            <label className="text-sm font-semibold text-gray-700">
+                {label}
+                {required && (
+                    <span className="ml-0.5 text-red-500">*</span>
+                )}
+            </label>
+
+            <textarea
+                name={name}
+                value={value || ""}
+                onChange={onChange}
+                readOnly={readOnly}
+                placeholder={placeholder}
+                rows={3}
+                className={`w-full resize-none rounded-xl border px-4 py-2.5 text-sm outline-none transition
+                    ${readOnly
+                        ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-500"
+                        : error
+                            ? "border-red-400 bg-white text-gray-700 ring-2 ring-red-100"
+                            : "border-gray-200 bg-white text-gray-700 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                    }
+                `}
+            />
+
+            {error && !readOnly && (
+                <span className="text-xs font-medium text-red-500">
+                    Este campo es obligatorio
+                </span>
+            )}
+        </div>
+    );
+}
+
+export default function ActualizarPerfil() {
+    const navigate = useNavigate();
+    const { setPerfilCompletado } = useOutletContext();
+
+    const [form, setForm] = useState({});
+    const [perfilOriginal, setPerfilOriginal] = useState({});
+    const [errors, setErrors] = useState({});
+
+    const [rolActivo, setRolActivo] = useState("");
+
+    const [esPracticante, setEsPracticante] = useState(false);
+    const [esCandidato, setEsCandidato] = useState(false);
+    const [esTutorDocente, setEsTutorDocente] = useState(false);
+    const [esTutorEmpresa, setEsTutorEmpresa] = useState(false);
+
+    const [editando, setEditando] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    const [departamentos, setDepartamentos] = useState([]);
+    const [municipios, setMunicipios] = useState([]);
+    const [cargandoMunicipios, setCargandoMunicipios] = useState(false);
+
+    const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
+
+    useEffect(() => {
+        const cargarPerfil = async () => {
+            try {
+                setLoading(true);
+
+                const rol = localStorage.getItem("rolActivo") || "";
+                setRolActivo(rol);
+
+                const esUsuarioPracticante = rol === "Practicante";
+                const esUsuarioCandidato = rol === "Candidato";
+                const esUsuarioTutorDocente = rol === "Tutor Docente";
+                const esUsuarioTutorEmpresa = rol === "Tutor Empresarial";
+
+                setEsPracticante(esUsuarioPracticante);
+                setEsCandidato(esUsuarioCandidato);
+                setEsTutorDocente(esUsuarioTutorDocente);
+                setEsTutorEmpresa(esUsuarioTutorEmpresa);
+
+                let departamentosData = [];
+
+                if (esUsuarioPracticante) {
+                    departamentosData =
+                        await departamentoMunicipioRepository.getDepartamentos();
+
+                    setDepartamentos(departamentosData);
+                }
+
+                const usuario = await userRepository.getMe();
+
+                const candidato = usuario?.candidato;
+                const practicante = candidato?.practicante;
+
+                const tutorDocente = usuario?.tutorDocente;
+                const tutorEmpresa = usuario?.tutorEmpresa;
+
+                let departamentoId = "";
+                let municipioId = "";
+
+                if (esUsuarioPracticante && practicante) {
+                    const departamento = departamentosData.find(
+                        (item) =>
+                            String(item.codigo) ===
+                            String(practicante.codigoDepResidencia)
+                    );
+
+                    if (departamento) {
+                        departamentoId = departamento.id;
+
+                        const municipiosData =
+                            await departamentoMunicipioRepository
+                                .getMunicipiosPorDepartamento(departamento.id);
+
+                        setMunicipios(municipiosData);
+
+                        const municipio = municipiosData.find(
+                            (item) =>
+                                String(item.codigo) ===
+                                String(practicante.codigoMunResidencia)
+                        );
+
+                        if (municipio) {
+                            municipioId = municipio.id;
+                        }
+                    }
+                }
+
+                const datosPerfil = {
+                    nombres: usuario?.nombres || "",
+                    apellidos: usuario?.apellidos || "",
+                    correo: usuario?.correo || "",
+                    tipo_documento: usuario?.tipo_documento || "",
+                    cedula: usuario?.cedula || "",
+                    telefono: usuario?.telefono || "",
+
+                    // Código de candidato o código de docente
+                    codigo: esUsuarioTutorDocente
+                        ? tutorDocente?.codigo || ""
+                        : candidato?.codigo || "",
+
+                    // Cargo del tutor empresarial
+                    cargo: tutorEmpresa?.cargo || "",
+
+                    eps: practicante?.eps || "",
+                    departamentoId,
+                    municipioId,
+                    fecha_nacimiento: practicante?.fecha_nacimiento || "",
+                    genero: practicante?.genero || "",
+                    direccion: practicante?.direccion || ""
+                };
+
+                setForm(datosPerfil);
+                setPerfilOriginal({ ...datosPerfil });
+
+                // Detectar si el perfil tiene campos obligatorios pendientes.
+                const camposRequeridos = [
+                    ...CAMPOS_OBLIGATORIOS_BASE,
+                    ...(esUsuarioPracticante
+                        ? CAMPOS_OBLIGATORIOS_PRACTICANTE
+                        : []),
+                    ...(esUsuarioTutorEmpresa
+                        ? ["cargo"]
+                        : [])
+                ];
+
+                const perfilIncompleto = camposRequeridos.some((campo) => {
+                    const valor = datosPerfil[campo];
+
+                    return (
+                        valor === null ||
+                        valor === undefined ||
+                        String(valor).trim() === ""
+                    );
+                });
+
+                // Si faltan datos, activar directamente el formulario.
+                setEditando(perfilIncompleto);
+
+            } catch (error) {
+                console.error("Error cargando perfil:", error);
+
+                toast.error(
+                    error.response?.data?.message ||
+                    "No se pudo cargar el perfil"
+                );
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        cargarPerfil();
+    }, []);
+
+    const handleChange = async (e) => {
+        const { name, value } = e.target;
+
+        let nuevoValor = value;
+
+        if (name === "eps") {
+            nuevoValor = value.toUpperCase();
+        }
+
+        if (name === "departamentoId") {
+            setForm((prev) => ({
+                ...prev,
+                departamentoId: value,
+                municipioId: ""
+            }));
+
+            setMunicipios([]);
+
+            setErrors((prev) => ({
+                ...prev,
+                departamentoId: false,
+                municipioId: false
+            }));
+
+            if (!value) return;
+
+            try {
+                setCargandoMunicipios(true);
+
+                const municipiosData =
+                    await departamentoMunicipioRepository
+                        .getMunicipiosPorDepartamento(value);
+
+                setMunicipios(municipiosData);
+
+            } catch (error) {
+                console.error("Error cargando municipios:", error);
+
+                toast.error(
+                    error.response?.data?.message ||
+                    "No se pudieron cargar los municipios"
+                );
+            } finally {
+                setCargandoMunicipios(false);
+            }
+
+            return;
+        }
+
+        setForm((prev) => ({
+            ...prev,
+            [name]: nuevoValor
+        }));
+
+        if (errors[name] && String(nuevoValor).trim() !== "") {
+            setErrors((prev) => ({
+                ...prev,
+                [name]: false
+            }));
+        }
+    };
+
+    const validarFormulario = () => {
+        const camposRequeridos = [
+            ...CAMPOS_OBLIGATORIOS_BASE,
+            ...(esPracticante
+                ? CAMPOS_OBLIGATORIOS_PRACTICANTE
+                : []),
+            ...(esTutorEmpresa
+                ? ["cargo"]
+                : [])
+        ];
+
+        const nuevosErrores = {};
+        let hayErrores = false;
+
+        camposRequeridos.forEach((campo) => {
+            const valor = form[campo];
+
+            if (!valor || String(valor).trim() === "") {
+                nuevosErrores[campo] = true;
+                hayErrores = true;
+            }
+        });
+
+        if (esPracticante && form.fecha_nacimiento) {
+            const fechaNacimiento = new Date(
+                `${form.fecha_nacimiento}T00:00:00`
+            );
+
+            const hoy = new Date();
+
+            const fechaMaxima = new Date(
+                hoy.getFullYear() - 18,
+                hoy.getMonth(),
+                hoy.getDate()
+            );
+
+            const fechaMinima = new Date("1900-01-01T00:00:00");
+
+            if (
+                Number.isNaN(fechaNacimiento.getTime()) ||
+                fechaNacimiento > fechaMaxima ||
+                fechaNacimiento < fechaMinima
+            ) {
+                nuevosErrores.fecha_nacimiento = true;
+                hayErrores = true;
+
+                toast.error(
+                    "Debes tener mínimo 18 años y registrar una fecha válida."
+                );
+            }
+        }
+
+        setErrors(nuevosErrores);
+
+        return !hayErrores;
+    };
+
+    // Datos de identidad: se pueden registrar la primera vez (si estaban
+    // vacíos), pero una vez guardados ya no se pueden cambiar.
+    const tipoDocumentoBloqueado = estaLleno(perfilOriginal.tipo_documento);
+    const cedulaBloqueada = estaLleno(perfilOriginal.cedula);
+
+    const handleActivarEdicion = () => {
+        setEditando(true);
+    };
+
+    const handleCancelarEdicion = () => {
+        const camposRequeridos = [
+            ...CAMPOS_OBLIGATORIOS_BASE,
+            ...(esPracticante
+                ? CAMPOS_OBLIGATORIOS_PRACTICANTE
+                : []),
+            ...(esTutorEmpresa
+                ? ["cargo"]
+                : [])
+        ];
+
+        const perfilIncompleto = camposRequeridos.some((campo) => {
+            const valor = perfilOriginal[campo];
+
+            return (
+                valor === null ||
+                valor === undefined ||
+                String(valor).trim() === ""
+            );
+        });
+
+        setForm({ ...perfilOriginal });
+        setErrors({});
+        setMostrarConfirmacion(false);
+
+        // No permitir abandonar la edición si faltan datos obligatorios.
+        setEditando(perfilIncompleto);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!validarFormulario()) {
+            toast.error(
+                "Completa los campos obligatorios marcados en rojo"
+            );
+            return;
+        }
+
+        setMostrarConfirmacion(true);
+    };
+
+    const confirmarGuardado = async () => {
+        try {
+            setSaving(true);
+            setMostrarConfirmacion(false);
+
+            // Lo que no se debe enviar: correo y código nunca se editan aquí,
+            // y el documento tampoco una vez registrado.
+            const datosAEnviar = { ...form };
+
+            delete datosAEnviar.correo;
+            delete datosAEnviar.codigo;
+
+            if (tipoDocumentoBloqueado) delete datosAEnviar.tipo_documento;
+            if (cedulaBloqueada) delete datosAEnviar.cedula;
+
+            await actualizarPerfil(
+                { userRepository },
+                datosAEnviar
+            );
+
+            // Actualizar el estado global del Layout inmediatamente.
+            setPerfilCompletado(true);
+
+            toast.success("Perfil actualizado correctamente");
+
+            setPerfilOriginal({ ...form });
+            setEditando(false);
+
+            if (rolActivo === "Practicante") {
+                window.location.replace("/homePracticante");
+            } else {
+                window.location.reload();
+            }
+
+        } catch (error) {
+            console.error("Error actualizando perfil:", error);
+
+            toast.error(
+                error.response?.data?.message ||
+                "No se pudo actualizar el perfil"
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex min-h-[70vh] items-center justify-center">
+                <p className="text-sm text-gray-500">
+                    Cargando perfil...
+                </p>
+            </div>
+        );
+    }
+
+    const tituloInformacionAdicional = esTutorDocente
+        ? "Información académica"
+        : esTutorEmpresa
+            ? "Información empresarial"
+            : "Información académica";
+
+    return (
+        <div>
+            <div className="mx-auto w-full max-w-5xl px-4 py-8">
+
+                {/* ENCABEZADO */}
+                <div className="mb-8 flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-800">
+                            Mi perfil
+                        </h1>
+
+                        <p className="mt-1 text-sm text-gray-500">
+                            {editando
+                                ? "Edita tu información y guarda los cambios."
+                                : "Actualiza tu información personal y los datos asociados a tu perfil."
+                            }
+                        </p>
+                    </div>
+
+                    {!editando && (
+                        <button
+                            type="button"
+                            onClick={handleActivarEdicion}
+                            className="shrink-0 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                        >
+                            Editar perfil
+                        </button>
+                    )}
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+
+                    {/* INFORMACIÓN PERSONAL */}
+                    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+                        <div className="mb-6">
+                            <h2 className="text-lg font-semibold text-gray-800">
+                                Información personal
+                            </h2>
+
+                            <p className="mt-1 text-sm text-gray-500">
+                                Información básica de tu cuenta.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                            <FieldRow
+                                label="Nombres"
+                                name="nombres"
+                                value={form.nombres}
+                                onChange={handleChange}
+                                disabled={!editando}
+                                placeholder="Ej: Juan Camilo"
+                                required
+                                error={errors.nombres}
+                            />
+
+                            <FieldRow
+                                label="Apellidos"
+                                name="apellidos"
+                                value={form.apellidos}
+                                onChange={handleChange}
+                                disabled={!editando}
+                                placeholder="Ej: Pérez Gómez"
+                                required
+                                error={errors.apellidos}
+                            />
+
+                            <FieldRow
+                                label="Tipo de documento"
+                                name="tipo_documento"
+                                value={form.tipo_documento}
+                                onChange={handleChange}
+                                disabled={!editando || tipoDocumentoBloqueado}
+                                options={tiposDocumento}
+                                placeholder="Seleccione un tipo"
+                                required
+                                error={errors.tipo_documento}
+                            />
+
+                            <FieldRow
+                                label="Número de documento"
+                                name="cedula"
+                                value={form.cedula}
+                                onChange={handleChange}
+                                disabled={!editando || cedulaBloqueada}
+                                placeholder="Ej: 1091234567"
+                                required
+                                error={errors.cedula}
+                            />
+
+                            <FieldRow
+                                label="Teléfono"
+                                name="telefono"
+                                value={form.telefono}
+                                onChange={handleChange}
+                                disabled={!editando}
+                                placeholder="Ej: 3001234567"
+                                required
+                                error={errors.telefono}
+                            />
+
+                            <FieldRow
+                                label="Correo electrónico"
+                                name="correo"
+                                value={form.correo}
+                                readOnly
+                                placeholder="correo@ejemplo.com"
+                            />
+                        </div>
+
+                        <p className="mt-4 text-xs text-gray-400">
+                            El correo electrónico es asignado mediante
+                            invitación y no puede modificarse.
+                            {(tipoDocumentoBloqueado || cedulaBloqueada) && (
+                                <>
+                                    {" "}El tipo y número de documento, una vez
+                                    registrados, tampoco pueden modificarse; si
+                                    hay un error, comunícate con el
+                                    administrador.
+                                </>
+                            )}
+                        </p>
+                    </section>
+
+                    {/* INFORMACIÓN DE CANDIDATO */}
+                    {(esCandidato || esPracticante) && (
+                        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+                            <div className="mb-6">
+                                <h2 className="text-lg font-semibold text-gray-800">
+                                    Información académica
+                                </h2>
+
+                                <p className="mt-1 text-sm text-gray-500">
+                                    Información asociada a tu registro como candidato.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                <FieldRow
+                                    label="Código de candidato"
+                                    name="codigo"
+                                    value={form.codigo}
+                                    readOnly
+                                    placeholder="Código asignado por el sistema"
+                                />
+                            </div>
+
+                            <p className="mt-4 text-xs text-gray-400">
+                                El código es asignado por el sistema y no puede
+                                modificarse desde este formulario.
+                            </p>
+                        </section>
+                    )}
+
+                    {(esCandidato || esPracticante) && <PerfilProfesionalSection />}
+
+                    {/* INFORMACIÓN DEL TUTOR DOCENTE */}
+                    {esTutorDocente && (
+                        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+                            <div className="mb-6">
+                                <h2 className="text-lg font-semibold text-gray-800">
+                                    Información académica
+                                </h2>
+
+                                <p className="mt-1 text-sm text-gray-500">
+                                    Información asociada a tu registro como tutor docente.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                <FieldRow
+                                    label="Código de docente"
+                                    name="codigo"
+                                    value={form.codigo}
+                                    readOnly
+                                    placeholder="Código asignado por el sistema"
+                                />
+                            </div>
+
+                            <p className="mt-4 text-xs text-gray-400">
+                                El código de docente es asignado por el sistema
+                                y no puede modificarse desde este formulario.
+                            </p>
+                        </section>
+                    )}
+
+                    {/* INFORMACIÓN DEL TUTOR EMPRESARIAL */}
+                    {esTutorEmpresa && (
+                        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+                            <div className="mb-6">
+                                <h2 className="text-lg font-semibold text-gray-800">
+                                    Información empresarial
+                                </h2>
+
+                                <p className="mt-1 text-sm text-gray-500">
+                                    Información asociada a tu registro como tutor empresarial.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                <FieldRow
+                                    label="Cargo"
+                                    name="cargo"
+                                    value={form.cargo}
+                                    onChange={handleChange}
+                                    disabled={!editando}
+                                    placeholder="Ej: Coordinador de sistemas"
+                                    required
+                                    error={errors.cargo}
+                                />
+                            </div>
+                        </section>
+                    )}
+
+                    {/* INFORMACIÓN DEL PRACTICANTE */}
+                    {esPracticante && (
+                        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+                            <div className="mb-6">
+                                <h2 className="text-lg font-semibold text-gray-800">
+                                    Información de práctica
+                                </h2>
+
+                                <p className="mt-1 text-sm text-gray-500">
+                                    Completa la información requerida para
+                                    tu perfil como practicante.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                <FieldRow
+                                    label="EPS"
+                                    name="eps"
+                                    value={form.eps}
+                                    onChange={handleChange}
+                                    disabled={!editando}
+                                    placeholder="Ej: SURA, SANITAS, NUEVA EPS"
+                                    required
+                                    error={errors.eps}
+                                />
+
+                                <FieldRow
+                                    label="Fecha de nacimiento"
+                                    name="fecha_nacimiento"
+                                    type="date"
+                                    value={form.fecha_nacimiento}
+                                    onChange={handleChange}
+                                    disabled={!editando}
+                                    max={new Date(
+                                        new Date().setFullYear(
+                                            new Date().getFullYear() - 18
+                                        )
+                                    ).toISOString().split("T")[0]}
+                                    min="1900-01-01"
+                                    required
+                                    error={errors.fecha_nacimiento}
+                                />
+
+                                <FieldRow
+                                    label="Género"
+                                    name="genero"
+                                    value={form.genero}
+                                    onChange={handleChange}
+                                    disabled={!editando}
+                                    options={generos}
+                                    placeholder="Seleccione un género"
+                                    required
+                                    error={errors.genero}
+                                />
+
+                                <FieldRow
+                                    label="Departamento de residencia"
+                                    name="departamentoId"
+                                    value={form.departamentoId}
+                                    onChange={handleChange}
+                                    disabled={!editando}
+                                    options={departamentos.map((departamento) => ({
+                                        value: departamento.id,
+                                        label: departamento.nombre
+                                    }))}
+                                    placeholder="Seleccione un departamento"
+                                    required
+                                    error={errors.departamentoId}
+                                />
+
+                                <FieldRow
+                                    label="Municipio de residencia"
+                                    name="municipioId"
+                                    value={form.municipioId}
+                                    onChange={handleChange}
+                                    disabled={
+                                        !editando ||
+                                        !form.departamentoId ||
+                                        cargandoMunicipios
+                                    }
+                                    options={municipios.map((municipio) => ({
+                                        value: municipio.id,
+                                        label: municipio.nombre
+                                    }))}
+                                    placeholder={
+                                        cargandoMunicipios
+                                            ? "Cargando municipios..."
+                                            : form.departamentoId
+                                                ? "Seleccione un municipio"
+                                                : "Seleccione primero un departamento"
+                                    }
+                                    required
+                                    error={errors.municipioId}
+                                />
+
+                                <FieldLarge
+                                    label="Dirección de residencia"
+                                    name="direccion"
+                                    value={form.direccion}
+                                    onChange={handleChange}
+                                    readOnly={!editando}
+                                    placeholder="Ej: Calle 10 # 5-23, Barrio Centro"
+                                    required
+                                    error={errors.direccion}
+                                />
+                            </div>
+                        </section>
+                    )}
+
+                    {/* BOTONES */}
+                    {editando && (
+                        <div className="flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={handleCancelarEdicion}
+                                disabled={saving}
+                                className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="rounded-xl bg-red-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {saving ? "Guardando..." : "Guardar cambios"}
+                            </button>
+                        </div>
+                    )}
+                </form>
+            </div>
+
+            {/* MODAL DE CONFIRMACIÓN */}
+            {mostrarConfirmacion && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+                    <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+
+                        <div className="border-b border-gray-200 px-6 py-5">
+                            <h2 className="text-xl font-bold text-gray-800">
+                                Confirmar información
+                            </h2>
+
+                            <p className="mt-1 text-sm text-gray-500">
+                                ¿Está seguro de que la información ingresada
+                                es correcta?
+                            </p>
+                        </div>
+
+                        <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                                {[
+                                    ["NOMBRES", form.nombres],
+                                    ["APELLIDOS", form.apellidos],
+                                    ["TIPO DE DOCUMENTO", form.tipo_documento],
+                                    ["NÚMERO DE DOCUMENTO", form.cedula],
+                                    ["TELÉFONO", form.telefono],
+                                    ["CORREO", form.correo]
+                                ].map(([label, value]) => (
+                                    <div key={label}>
+                                        <p className="text-xs font-semibold text-gray-400">
+                                            {label}
+                                        </p>
+                                        <p className="break-all text-sm font-medium text-gray-700">
+                                            {value || "—"}
+                                        </p>
+                                    </div>
+                                ))}
+
+                                {(esCandidato || esPracticante || esTutorDocente) && (
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-400">
+                                            {esTutorDocente ? "CÓDIGO DE DOCENTE" : "CÓDIGO"}
+                                        </p>
+                                        <p className="text-sm font-medium text-gray-700">
+                                            {form.codigo || "—"}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {esTutorEmpresa && (
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-400">
+                                            CARGO
+                                        </p>
+                                        <p className="text-sm font-medium text-gray-700">
+                                            {form.cargo || "—"}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {esPracticante && (
+                                    <>
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-400">
+                                                EPS
+                                            </p>
+                                            <p className="text-sm font-medium text-gray-700">
+                                                {form.eps}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-400">
+                                                FECHA DE NACIMIENTO
+                                            </p>
+                                            <p className="text-sm font-medium text-gray-700">
+                                                {form.fecha_nacimiento}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-400">
+                                                GÉNERO
+                                            </p>
+                                            <p className="text-sm font-medium text-gray-700">
+                                                {form.genero}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-400">
+                                                DEPARTAMENTO
+                                            </p>
+                                            <p className="text-sm font-medium text-gray-700">
+                                                {departamentos.find(
+                                                    (departamento) =>
+                                                        String(departamento.id) ===
+                                                        String(form.departamentoId)
+                                                )?.nombre || "No seleccionado"}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-400">
+                                                MUNICIPIO
+                                            </p>
+                                            <p className="text-sm font-medium text-gray-700">
+                                                {municipios.find(
+                                                    (municipio) =>
+                                                        String(municipio.id) ===
+                                                        String(form.municipioId)
+                                                )?.nombre || "No seleccionado"}
+                                            </p>
+                                        </div>
+
+                                        <div className="sm:col-span-2">
+                                            <p className="text-xs font-semibold text-gray-400">
+                                                DIRECCIÓN
+                                            </p>
+                                            <p className="text-sm font-medium text-gray-700">
+                                                {form.direccion}
+                                            </p>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                            <button
+                                type="button"
+                                onClick={() => setMostrarConfirmacion(false)}
+                                disabled={saving}
+                                className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Revisar
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={confirmarGuardado}
+                                disabled={saving}
+                                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {saving ? "Guardando..." : "Sí, confirmar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

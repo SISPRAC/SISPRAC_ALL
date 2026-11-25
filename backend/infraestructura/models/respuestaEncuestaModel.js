@@ -1,0 +1,55 @@
+
+import SequelizePackage from "sequelize";
+const { DataTypes } = SequelizePackage;
+
+const createRespuestaEncuestaModel = (sequelize) => {
+
+    const RespuestaEncuesta = sequelize.define(
+        "RespuestaEncuesta",
+        {
+            id: {
+                type: DataTypes.INTEGER,
+                primaryKey: true,
+                autoIncrement: true,
+            },
+
+            usuario_id: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+            },
+
+            practica_encuesta_id: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+            },
+
+            practicante_id: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+
+                references: {
+                    model: "Practicante",
+                    key: "id",
+                },
+
+                onDelete: "CASCADE",
+                onUpdate: "CASCADE",
+            },
+
+            fecha: {
+                type: DataTypes.DATE,
+                allowNull: false,
+                defaultValue: DataTypes.NOW,
+            },
+        },
+        {
+            tableName: "RespuestaEncuesta",
+            freezeTableName: true,
+            timestamps: false,         
+        }
+    );
+
+    return RespuestaEncuesta;
+};
+
+export default createRespuestaEncuestaModel;

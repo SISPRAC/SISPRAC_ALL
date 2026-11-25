@@ -1,0 +1,70 @@
+import SequelizePackage from "sequelize";
+const { DataTypes } = SequelizePackage;
+
+const createUserModel = (sequelize) => {
+
+    const User = sequelize.define('Usuario', {
+
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true
+        },
+
+        nombres: {
+            type: DataTypes.STRING(50),
+            allowNull: false
+        },
+
+        apellidos: {
+            type: DataTypes.STRING(50),
+            allowNull: false
+        },
+
+        correo: {
+            type: DataTypes.STRING(100),
+            allowNull: false,
+            unique: true
+        },
+
+        password: {
+            type: DataTypes.STRING(255),
+            allowNull: false
+        },
+
+        google_id: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+            unique: true
+        },
+
+        tipo_documento: {
+            type: DataTypes.ENUM('CC', 'CE', 'PEP', 'PA'),
+            allowNull: false
+        },
+
+        cedula: {
+            type: DataTypes.STRING(15),
+            allowNull: false,
+            unique: true
+        },
+
+        telefono: {
+            type: DataTypes.STRING(15),
+            allowNull: false
+        },
+
+        estado: {
+            type: DataTypes.ENUM('ACTIVO', 'INACTIVO'),
+            allowNull: false,
+            defaultValue: 'ACTIVO'
+        }
+
+    }, {
+        timestamps: false
+    });
+
+    return User;
+}
+
+export default createUserModel;

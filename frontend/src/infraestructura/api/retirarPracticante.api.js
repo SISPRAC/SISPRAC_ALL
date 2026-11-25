@@ -1,0 +1,72 @@
+import { createApi } from "./createApi.js";
+
+const retiroPracticanteApi = createApi("/retiroPracticante");
+
+retiroPracticanteApi.interceptors.request.use(
+
+    (config) => {
+
+        const token = localStorage.getItem("token");
+
+
+        if (token) {
+
+            config.headers.Authorization =
+                `Bearer ${token}`;
+
+        }
+
+
+        return config;
+
+    },
+
+    (error) => {
+
+        return Promise.reject(error);
+
+    }
+
+);
+
+
+export const crearRetiroPracticanteRequest = (data) => {
+
+    return retiroPracticanteApi.post(
+        "/",
+        data,
+        {
+            headers: {
+                "Content-Type": "multipart/form-data"
+            }
+        }
+    );
+
+};
+
+
+export const getRetirosRequest = () => {
+
+    return retiroPracticanteApi.get("/");
+
+};
+
+
+export const getRetiroRequest = (id) => {
+
+    return retiroPracticanteApi.get(
+        `/${id}`
+    );
+
+};
+
+
+export const getRetirosDePracticanteRequest = (
+    practicanteId
+) => {
+
+    return retiroPracticanteApi.get(
+        `/practicante/${practicanteId}`
+    );
+
+};

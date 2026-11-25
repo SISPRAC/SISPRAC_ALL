@@ -1,0 +1,48 @@
+import { createApi } from "./createApi.js"; // misma carpeta que auth.api.js
+
+const userApi = createApi("/users");
+
+userApi.interceptors.request.use(
+    (config) => {
+
+        const token = localStorage.getItem("token");
+
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
+
+export const getUsersRequest = async () => {
+    return await userApi.get("/all");
+};
+
+export const getUserRequest = async () => {
+    return await userApi.get("/me");
+};
+
+export const updateUserRolesRequest = async (id, roles) => {
+    return await userApi.put(`/${id}/roles`, {
+        roles
+    });
+};
+
+export const deleteUserRequest = async (id) => {
+    return await userApi.delete(`/${id}`);
+};
+
+export const cambiarEstadoUsuarioRequest = async (id, estado) => {
+    return await userApi.patch(`/${id}/estado`, {
+        estado
+    });
+};
+
+export const actualizarPerfilRequest = async (datos) => {
+    return await userApi.put("/perfil", datos);
+};

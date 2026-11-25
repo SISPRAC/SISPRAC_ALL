@@ -1,0 +1,86 @@
+import { createApi } from "./createApi.js";
+
+const candidatoApi = createApi("/candidato");
+
+candidatoApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Registrar candidato
+export const registerCandidatoRequest = (data, token) => {
+
+  return candidatoApi.post(
+    "/registrarCandidato",
+    data,
+    {
+      params: {
+        token
+      },
+      headers: {
+        "Content-Type": "multipart/form-data"
+      }
+    }
+  );
+
+};
+
+// Actualizar candidato
+export const updateCandidatoRequest = (id, data) => {
+  return candidatoApi.put(`/${id}`, data, {
+    headers: {
+      "Content-Type": "multipart/form-data"
+    }
+  });
+};
+
+// Obtener todos los candidatos
+export const getCandidatos = () => {
+  return candidatoApi.get("/all");
+};
+
+// Obtener candidatos disponibles
+export const getCandidatosDisponibles = () => {
+  return candidatoApi.get("/disponibles");
+};
+
+// Obtener candidatos por perfil
+export const getCandidatosPerfil = (perfilNombre) => {
+  return candidatoApi.get(`/perfil/${perfilNombre}`);
+};
+
+// Invitar candidato
+export const invitarCandidatoRequest = (data) => {
+  return candidatoApi.post("/invitacion", data);
+};
+
+// Invitar varios candidatos en una sola petición
+export const invitarCandidatosMasivoRequest = (data) => {
+  return candidatoApi.post("/invitacion/masiva", data);
+};
+
+// Obtener candidatos para el reporte por período
+export const obtenerCandidatosParaReportePorPeriodoRequest = (periodo_id) => {
+  return candidatoApi.get(`/reporte/periodo/${periodo_id}`);
+};
+
+// Verificar candidatos del PDF (registrados / no registrados)
+export const verificarCandidatosPdfRequest = (alumnos) => {
+  return candidatoApi.post("/verificar-pdf", { alumnos });
+};
+
+export const getMiPerfilProfesionalRequest = () =>
+  candidatoApi.get("/mi-perfil-profesional");
+
+export const updateMiPerfilProfesionalRequest = (data) =>
+  candidatoApi.put("/mi-perfil-profesional", data);

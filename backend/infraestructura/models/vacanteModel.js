@@ -1,0 +1,51 @@
+import SequelizePackage from "sequelize";
+const { DataTypes } = SequelizePackage;
+
+const createVacanteModel = (sequelize) => {
+
+    const Vacante = sequelize.define('Vacante', {
+
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true
+        },
+
+        convenio_id: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+
+            references: {
+                model: "Convenios",
+                key: "id"
+            }
+        },
+
+        nombre: {
+            type: DataTypes.STRING(80),
+            allowNull: false,
+            unique: false
+        },
+
+        descripcion: {
+            type: DataTypes.STRING(1000),
+            allowNull: false
+        },
+
+        estado: {
+            type: DataTypes.ENUM(
+                'DISPONIBLE',
+                'CERRADA'
+            ),
+            allowNull: false,
+            defaultValue: 'DISPONIBLE'
+        }
+
+    }, {
+        timestamps: false
+    });
+
+    return Vacante;
+}
+
+export default createVacanteModel;

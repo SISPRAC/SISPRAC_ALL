@@ -1,0 +1,187 @@
+import { createApi } from "./createApi.js";
+
+const empresaApi = createApi("/empresa");
+
+
+// =========================================================
+// TOKEN DE AUTENTICACIÓN NORMAL
+// =========================================================
+
+empresaApi.interceptors.request.use(
+
+    (config) => {
+
+        const token = localStorage.getItem("token");
+
+        if (token) {
+
+            config.headers.Authorization =
+                `Bearer ${token}`;
+
+        }
+
+        return config;
+
+    },
+
+    (error) => {
+
+        return Promise.reject(error);
+
+    }
+
+);
+
+
+// =========================================================
+// REGISTRAR EMPRESA
+// =========================================================
+
+export const registerEmpresaRequest = (data, token) => {
+
+    return empresaApi.post(
+        `/registrarEmpresa?token=${encodeURIComponent(token)}`,
+        data,
+        {
+            headers: {
+                "Content-Type": "multipart/form-data"
+            }
+        }
+    );
+
+};
+
+
+// =========================================================
+// INVITAR EMPRESA
+// =========================================================
+
+export const invitarEmpresaRequest = (data) => {
+
+    return empresaApi.post(
+        "/invitacion",
+        data
+    );
+
+};
+
+
+// =========================================================
+// OBTENER EMPRESA DEL USUARIO AUTENTICADO
+// =========================================================
+
+export const getMiEmpresaRequest = () => {
+
+    return empresaApi.get(
+        "/mi-empresa"
+    );
+
+};
+
+
+// =========================================================
+// OBTENER GRUPOS DE LA EMPRESA AUTENTICADA
+// =========================================================
+
+export const getMisGruposRequest = () => {
+
+    return empresaApi.get(
+        "/mis-grupos"
+    );
+
+};
+
+
+// =========================================================
+// OBTENER DETALLE DE UN GRUPO
+// =========================================================
+
+export const getDetalleGrupoEmpresaRequest = (
+    practicaId
+) => {
+
+    return empresaApi.get(
+        `/mis-grupos/${practicaId}`
+    );
+
+};
+
+
+// =========================================================
+// ACTUALIZAR EMPRESA
+// =========================================================
+
+export const actualizarEmpresaRequest = (
+    id,
+    data
+) => {
+
+    return empresaApi.put(
+        `/${id}`,
+        data
+    );
+
+};
+
+
+// =========================================================
+// OBTENER EMPRESAS PARA REPORTE POR PERÍODO
+// =========================================================
+
+export const getEmpresasParaReportePorPeriodoRequest = (
+    periodo_id
+) => {
+
+    return empresaApi.get(
+        `/reporte/periodo/${periodo_id}`
+    );
+
+};
+
+// =========================================================
+// OBTENER EMPRESAS PARA SELECTS
+// =========================================================
+
+export const getEmpresasParaSelectRequest = (convenio = "activo") => {
+
+    return empresaApi.get(
+        `/select?convenio=${convenio}`
+    );
+
+};
+
+// =========================================================
+// SUBIR CERTIFICADO DE FINALIZACIÓN DE UN PRACTICANTE
+// =========================================================
+
+export const subirCertificadoFinalizacionRequest = (
+    practicanteId,
+    data
+) => {
+
+    return empresaApi.post(
+        `/practicantes/${practicanteId}/certificado`,
+        data,
+        {
+            headers: {
+                "Content-Type": "multipart/form-data"
+            }
+        }
+    );
+
+};
+
+
+// =========================================================
+// OBTENER CERTIFICADO DE FINALIZACIÓN DE UN PRACTICANTE
+// =========================================================
+
+export const getCertificadoFinalizacionRequest = (
+    practicanteId
+) => {
+
+    return empresaApi.get(
+        `/practicantes/${practicanteId}/certificado`
+    );
+
+};

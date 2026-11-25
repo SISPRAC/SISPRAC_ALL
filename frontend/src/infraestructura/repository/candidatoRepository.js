@@ -1,0 +1,60 @@
+import {
+  registerCandidatoRequest,
+  updateCandidatoRequest,
+  getCandidatos,
+  getCandidatosDisponibles,
+  getCandidatosPerfil,
+  invitarCandidatoRequest,
+  invitarCandidatosMasivoRequest,
+  obtenerCandidatosParaReportePorPeriodoRequest,
+  verificarCandidatosPdfRequest,
+  getMiPerfilProfesionalRequest,
+  updateMiPerfilProfesionalRequest
+} from "../api/candidato.api";
+
+export const candidatoRepository = {
+
+  async register(data, token) {
+    return await registerCandidatoRequest(data, token);
+  },
+
+  async update(id, data) {
+    return await updateCandidatoRequest(id, data);
+  },
+
+  async getAll() {
+    return await getCandidatos();
+  },
+
+  async getDisponibles() {
+    return await getCandidatosDisponibles();
+  },
+
+  async getCandidatosPerfiles(PerfilNombre) {
+    return await getCandidatosPerfil(PerfilNombre);
+  },
+
+  async invitar(data) {
+    return await invitarCandidatoRequest(data);
+  },
+
+  async invitarMasivo(data) {
+    return await invitarCandidatosMasivoRequest(data);
+  },
+
+  async getCandidatosParaReportePorPeriodo(periodo_id) {
+    return await obtenerCandidatosParaReportePorPeriodoRequest(periodo_id);
+  },
+  async verificarPdf(alumnos) {
+    return await verificarCandidatosPdfRequest(alumnos);
+  },
+  async getMiPerfilProfesional() {
+    const { data } = await getMiPerfilProfesionalRequest();
+    return data;
+  },
+  async updateMiPerfilProfesional(payload) {
+    const { data } = await updateMiPerfilProfesionalRequest(payload);
+    return data;
+  },
+
+};
