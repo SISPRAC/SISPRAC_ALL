@@ -11,7 +11,11 @@ export const ESTADOS_CONFIG = {
         text: "text-green-700",
         dot: "bg-green-500"
     },
-
+    "Sin convenio": {
+        bg: "bg-slate-100",
+        text: "text-slate-600",
+        dot: "bg-slate-400"
+    },
     Activo: {
         bg: "bg-green-100",
         text: "text-green-700",
@@ -64,7 +68,7 @@ export const ESTADOS_CONFIG = {
         text: "text-red-600",
         dot: "bg-red-500"
     },
-     Cancelado: {
+    Cancelado: {
         bg: "bg-red-100",
         text: "text-red-600",
         dot: "bg-red-500"

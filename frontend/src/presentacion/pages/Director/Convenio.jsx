@@ -183,6 +183,7 @@ export default function Convenios() {
 
         <GenericTable
           rows={rows}
+          rowKey="key"
           currentPage={currentPage}
           onPageChange={setCurrentPage}
 
@@ -192,13 +193,30 @@ export default function Convenios() {
               label: "Empresa",
               primary: true
             },
-             {
-              key: "fechaInicio",
-              label: "Inicio"
-            },
+            { key: "fechaInicio", label: "Inicio", render: (row) => row.fechaInicio ?? "—" },
+            { key: "fechaFin", label: "Fin", render: (row) => row.fechaFin ?? "—" },
             {
-              key: "fechaFin",
-              label: "Fin"
+              key: "requisitos",
+              label: "Requisitos",
+              render: (row) => {
+                const { total = 0, subidos = 0, completos = false } = row.requisitos ?? {};
+                const porcentaje = total ? Math.round((subidos / total) * 100) : 0;
+
+                return (
+                  <div className="min-w-[110px]">
+                    <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                      <span className="text-slate-700">{subidos} de {total}</span>
+                      {completos && <span className="text-emerald-600">Completos</span>}
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-slate-200">
+                      <div
+                        className={`h-1.5 rounded-full ${completos ? "bg-emerald-500" : "bg-amber-400"}`}
+                        style={{ width: `${porcentaje}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              },
             },
             {
               key: "estado",
@@ -213,7 +231,8 @@ export default function Convenios() {
             {
               icon: <FileSliders size={24} />,
               className: "hover:bg-blue-100",
-              onClick: handleVerConvenio
+              onClick: handleVerConvenio,
+              show: (row) => row.id !== null
             },
           ]}
 
